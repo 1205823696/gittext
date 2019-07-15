@@ -29,13 +29,13 @@ object DWD_DWS {
       val df = hiveContext.sql(finalSql)
       // 处理配置参数
       val mysqlTableName = args(0).split("\\.")(1)
-      val hiveTableName = args(0)
+//      val hiveTableName = args(0)
       val jdbcProp = JDBCUtils.getJdbcProp()._1
       val jdbcUrl = JDBCUtils.getJdbcProp()._2
       // 存入MySQL
-//      df.write.mode("append").jdbc(jdbcUrl,mysqlTableName,jdbcProp)
+      df.write.mode("append").jdbc(jdbcUrl,mysqlTableName,jdbcProp)
       // 存入Hive
-            df.write.mode(SaveMode.Overwrite).insertInto(hiveTableName)
+//            df.write.mode(SaveMode.Overwrite).insertInto(hiveTableName)
 
     }
   }

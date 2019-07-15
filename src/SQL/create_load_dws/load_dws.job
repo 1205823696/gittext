@@ -1,0 +1,2 @@
+type=command
+command=sh load dws_user_visit_month1.sh

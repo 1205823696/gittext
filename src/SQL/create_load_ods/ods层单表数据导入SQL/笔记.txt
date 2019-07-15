@@ -1,0 +1,240 @@
+1. 数仓介绍
+
+2. 数仓的模型
+	星型模型和雪花型模型
+	星型模型比较常用，也是数仓建模的基础，它是先定义一个事实中心表，然后根据中心表进行外键维度的关联
+	雪花型模型是星型的一种扩展，相比较星型模型来说，雪花型模型维度表较多，它是对维度表的一个扩展，那么可以说是比较细粒度的表结构，而星型模型是粗粒度的表结构
+	
+3.高效运营项目
+  目的：建立数据仓库
+  过程：源数据存在mySQL中,mysql的数据是业务数据，需要吧业务数据导入hive中进行分析，
+  
+  //在hive中建立与mysql中一样的数据库，数据都一样， hive  -f  : 后面跟的是SQL的执行文件    hive  -e：后面跟的是SQL的执行语句
+  //执行hive建库建表脚本，生成对应的库和表
+  hive -f hive_ods_create_table.sql
+  //查看sqoop job 
+  //为什么要建立sqoop job 
+  //搞成job，每天定时去跑，实现数据的自动化增量导入，sqoop支持job的管理，可以把导入创建成job重复去跑，并且它会在metastore中记录增值，每次执行增量导入之前去查询
+  //查所有的job
+  sqoop job -list
+  //执行job
+  sqoop job --exec sqoopimport1
+  //删除job
+  sqoop job --delete your_sqoop_job_name 
+	 
+4. 数仓的数据导入
+
+// sqoop创建Job（全量）
+sqoop job --create bap_code_category  -- import \
+--connect jdbc:mysql://192.168.86.111:3306/qfbap_ods?dontTrackOpenResources=true\&defaultFetchSize=1000\&useCursorFetch=true \
+--driver com.mysql.jdbc.Driver \
+--username root \
+--password 123456 \
+--table code_category \
+--delete-target-dir \
+--target-dir /qfbap/ods_tmp/ods_code_category \
+--fields-terminated-by '\001' \
+
+// 执行这个sqoop-job
+sqoop job -exec bap_code_category
+
+// 将数据load到hive中
+hive -e "load data inpath '/qfbap/ods_tmp/ods_code_category/*' into table qfbap_ods.ods_code_category"
+
+
+//user表（全量）
+sqoop job --create bap_user -- import \
+--connect jdbc:mysql://192.168.86.111:3306/qfbap_ods?dontTrackOpenResources=true\&defaultFetchSize=1000\&useCursorFetch=true \
+--driver com.mysql.jdbc.Driver \
+--username root \
+--password 123456 \
+--table user \
+--delete-target-dir \
+--target-dir /qfbap/ods_tmp/qfbap_ods.ods_user \
+--fields-terminated-by '\001' \
+/ 执行增量导入
+sqoop job -exec bap_user
+// 将数据load到hive中
+hive -e "load data inpath '/qfbap/ods_tmp/qfbap_ods.ods_user/*' into table qfbap_ods.ods_user "
+
+
+
+//user_extend（全量）
+sqoop job --create bap_user_extend -- import \
+--connect jdbc:mysql://192.168.86.111:3306/qfbap_ods?dontTrackOpenResources=true\&defaultFetchSize=1000\&useCursorFetch=true \
+--driver com.mysql.jdbc.Driver \
+--username root \
+--password 123456 \
+--table user_extend \
+--delete-target-dir \
+--target-dir /qfbap/ods_tmp/qfbap_ods.ods_user_extend \
+--fields-terminated-by '\001' \
+/ 执行增量导入
+sqoop job -exec bap_user_extend
+// 将数据load到hive中
+hive -e "load data inpath '/qfbap/ods_tmp/qfbap_ods.ods_user_extend/*' into table qfbap_ods.ods_user_extend "
+
+
+//user_addr（全量）
+sqoop job --create bap_user_addr -- import \
+--connect jdbc:mysql://192.168.86.111:3306/qfbap_ods?dontTrackOpenResources=true\&defaultFetchSize=1000\&useCursorFetch=true \
+--driver com.mysql.jdbc.Driver \
+--username root \
+--password 123456 \
+--table user_addr \
+--delete-target-dir \
+--target-dir /qfbap/ods_tmp/qfbap_ods.ods_user_addr \
+--fields-terminated-by '\001' \
+/ 执行增量导入
+sqoop job -exec bap_user_addr
+// 将数据load到hive中
+hive -e "load data inpath '/qfbap/ods_tmp/qfbap_ods.ods_user_addr/*' into table qfbap_ods.ods_user_addr "
+
+
+
+
+
+
+// sqoop创建Job（增量导入）
+sqoop job --create bap_us_order -- import \
+--connect jdbc:mysql://192.168.86.111:3306/qfbap_ods?dontTrackOpenResources=true\&defaultFetchSize=1000\&useCursorFetch=true \
+--driver com.mysql.jdbc.Driver \
+--username root \
+--password 123456 \
+--table us_order \
+--target-dir /qfbap/ods_tmp/ods_us_order/ \
+--fields-terminated-by '\001' \
+--check-column order_id \
+--incremental append \
+--last-value 0 \
+;
+// 执行增量导入
+sqoop job -exec bap_us_order
+
+// 将数据load到hive中
+hive -e "load data inpath '/qfbap/ods_tmp/ods_us_order/*' into table qfbap_ods.ods_us_order partition(dt=20190708)"
+
+//user_pc_click_log（增量）
+sqoop job --create bap_user_pc_click_log -- import \
+--connect jdbc:mysql://192.168.86.111:3306/qfbap_ods?dontTrackOpenResources=true\&defaultFetchSize=1000\&useCursorFetch=true \
+--driver com.mysql.jdbc.Driver \
+--username root \
+--password 123456 \
+--table user_pc_click_log \
+--target-dir /qfbap/ods_tmp/ods_user_pc_click_log/ \
+--fields-terminated-by '\001' \
+--check-column log_id \
+--incremental append \
+--last-value 0 \
+;
+// 执行增量导入
+sqoop job -exec bap_user_pc_click_log
+
+// 将数据load到hive中
+hive -e "load data inpath '/qfbap/ods_tmp/ods_user_pc_click_log/*' into table qfbap_ods.ods_user_pc_click_log partition(dt=20190708)"
+
+
+
+
+
+//user_app_click_log（增量）
+
+sqoop job --create bap_user_app_click_log -- import \
+--connect jdbc:mysql://192.168.86.111:3306/qfbap_ods?dontTrackOpenResources=true\&defaultFetchSize=1000\&useCursorFetch=true \
+--driver com.mysql.jdbc.Driver \
+--username root \
+--password 123456 \
+--table user_app_click_log \
+--target-dir /qfbap/ods_tmp/ods_user_app_click_log/ \
+--fields-terminated-by '\001' \
+--check-column log_id \
+--incremental append \
+--last-value 0 \
+;
+// 执行增量导入
+sqoop job -exec bap_user_app_click_log
+
+// 将数据load到hive中
+hive -e "load data inpath '/qfbap/ods_tmp/ods_user_app_click_log/*' into table qfbap_ods.ods_user_app_click_log partition(dt=20190708)"
+
+
+//order_delivery（增量）
+sqoop job --create bap_order_delivery -- import \
+--connect jdbc:mysql://192.168.86.111:3306/qfbap_ods?dontTrackOpenResources=true\&defaultFetchSize=1000\&useCursorFetch=true \
+--driver com.mysql.jdbc.Driver \
+--username root \
+--password 123456 \
+--table order_delivery \
+--target-dir /qfbap/ods_tmp/ods_order_delivery/ \
+--fields-terminated-by '\001' \
+--check-column order_id \
+--incremental append \
+--last-value 0 \
+;
+// 执行增量导入
+sqoop job -exec bap_order_delivery
+
+// 将数据load到hive中
+hive -e "load data inpath '/qfbap/ods_tmp/ods_order_delivery/*' into table qfbap_ods.ods_order_delivery partition(dt=20190708)"
+
+//cart（增量）
+
+sqoop job --create bap_cart -- import \
+--connect jdbc:mysql://192.168.86.111:3306/qfbap_ods?dontTrackOpenResources=true\&defaultFetchSize=1000\&useCursorFetch=true \
+--driver com.mysql.jdbc.Driver \
+--username root \
+--password 123456 \
+--table cart \
+--target-dir /qfbap/ods_tmp/ods_cart/ \
+--fields-terminated-by '\001' \
+--check-column cart_id \
+--incremental append \
+--last-value 0 \
+;
+// 执行增量导入
+sqoop job -exec bap_cart
+
+// 将数据load到hive中
+hive -e "load data inpath '/qfbap/ods_tmp/ods_cart/*' into table qfbap_ods.ods_cart partition(dt=20190708)"
+
+//order_item（增量）
+
+sqoop job --create bap_order_item -- import \
+--connect jdbc:mysql://192.168.86.111:3306/qfbap_ods?dontTrackOpenResources=true\&defaultFetchSize=1000\&useCursorFetch=true \
+--driver com.mysql.jdbc.Driver \
+--username root \
+--password 123456 \
+--table order_item \
+--target-dir /qfbap/ods_tmp/ods_order_item/ \
+--fields-terminated-by '\001' \
+--check-column user_id \
+--incremental append \
+--last-value 0 \
+;
+// 执行增量导入
+sqoop job -exec bap_order_item
+
+// 将数据load到hive中
+hive -e "load data inpath '/qfbap/ods_tmp/ods_order_item/*' into table qfbap_ods.ods_order_item partition(dt=20190708)"
+
+//biz_trade（增量）
+
+sqoop job --create bap_biz_trade -- import \
+--connect jdbc:mysql://192.168.86.111:3306/qfbap_ods?dontTrackOpenResources=true\&defaultFetchSize=1000\&useCursorFetch=true \
+--driver com.mysql.jdbc.Driver \
+--username root \
+--password 123456 \
+--table biz_trade  \
+--target-dir /qfbap/ods_tmp/ods_biz_trade/ \
+--fields-terminated-by '\001' \
+--check-column trade_id \
+--incremental append \
+--last-value 0 \
+;
+// 执行增量导入
+sqoop job -exec bap_biz_trade
+
+// 将数据load到hive中
+hive -e "load data inpath '/qfbap/ods_tmp/ods_biz_trade/*' into table qfbap_ods.ods_biz_trade partition(dt=20190708)"
+
+
